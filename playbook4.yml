@@ -1,7 +1,7 @@
 [student@workstation data-review]$ cat playbook.yml 
 ---
 
-- name: Playbook
+- name: Install and configure webserver with basic auth
   hosts: webserver
   vars_files:
     - vars/secret.yml
@@ -13,13 +13,13 @@
     python_pkg: python-passlib
     httpdconf_src: files/httpd.conf
     httpdconf_file: /etc/httpd/conf/httpd.conf
-    htaccess_srv: files/.htaccess
+    htaccess_src: files/.htaccess
     secrets_dir: /etc/httpd/secrets
-    secrets_file: "{{ secrets_dir }}/htpasswd }}"
+    secrets_file: "{{ secrets_dir }}/htpasswd"
     web_root: /var/www/html
-    web_user: guest 
+    web_user: guest
   tasks: 
-    - name: Verify firewall_pkg
+    - name: Verify that the Latest version of necessary packaged are installed
       yum: 
         name: 
           - "{{ firewall_pkg }}"
@@ -27,7 +27,7 @@
           - "{{ ssl_pkg }}"
           - "{{ python_pkg }}"
         state: latest
-    - name : Ensure the file is copied
+    - name : Configure webservice
       copy: 
         src: "{{ httpdconf_src }}"
         dest: "{{ httpdconf_file }}"
@@ -44,31 +44,35 @@
     - name: create an htpasswd file to be used for basic authent 
       htpasswd: 
         path: "{{ secrets_file }}"
-        name: "{{ web_user }} "
+        name: "{{ web_user }}"
         password: "{{ web_pass }}" 
         owner: apache
         group: apache
         mode: 0400
     - name: create the htaccess
       copy: 
-        src: "{{ htaccess_srv }}"
+        src: "{{ htaccess_src }}"
         dest: "{{ web_root }}/.htaccess"
         owner: apache
         group: apache
         mode: 0400
     - name: copy module index.html
       copy: 
-        content: "{{ ansible_facts['fqdn'] }} ({{ansible_facts['default_ipv4']['address'] }}) has been customized by Ansible. \n"
-        dest: "{{web_root }}/index.html }}" 
-        owner: 
+        content: "{{ ansible_facts['fqdn'] }} ({{ansible_facts['default_ipv4']['address'] }}) has been customized by Ansible.\n"
+        dest: "{{ web_root }}/index.html"  
     - name: Open the port  for the webserver
       firewalld: 
         service: https
         state: enabled
         immediate: true
         permanent: true
-    - name: 
+    - name: restart fw
       service:
         name: firewalld
         state: restarted
         enabled: true
+    - name: restart httpd
+      service:
+        name: httpd
+        state: restarted
+        enabled: true  
